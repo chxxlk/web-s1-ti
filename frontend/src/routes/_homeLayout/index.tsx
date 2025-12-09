@@ -22,6 +22,7 @@ import { useFetchAnnouncementsPaginated } from "@/features/announcement/hooks/us
 import SkeletonCardDisplay from "@/features/shared/components/skeletonCardDisplay";
 import AnnouncementCardDisplay from "@/features/announcement/components/announcementCardDisplay";
 
+
 export const Route = createFileRoute("/_homeLayout/")({
   component: Index,
 });
@@ -29,8 +30,7 @@ export const Route = createFileRoute("/_homeLayout/")({
 function Index() {
   const { data: announcements, isLoading: isFetchAnnouncementLoading } =
     useFetchAnnouncementsPaginated({ per_page: 3, sort_by: "latest", page: 1 });
-
-  return (
+    return (
     <div>
       {/* Carousel */}
       <div className="mx-auto w-full">
