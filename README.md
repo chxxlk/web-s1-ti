@@ -4,7 +4,7 @@
 
 - Pengumuman untuk mahasiswa S1 TI
 - Lowongan asisten dosen untuk mahasiswa S1 TI
-- Chatbot
+- Chatbot [Chris Stevanus Lekpey](https://github.com/chxxlk)
 
 ## Authors
 
