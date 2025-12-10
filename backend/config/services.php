@@ -34,5 +34,15 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'openrouter' => [
+        'api_key' => env('OPENROUTER_API_KEY'),
+        'model' => env('OPENROUTER_MODEL'),
+        'base_url' => env('OPENROUTER_BASE_URL'),
+    ],
+    'huggingface' => [
+        'api_key' => env('HF_API_KEY'),
+        'model' => env('HF_MODEL'),
+        'base_url' => env('HF_BASE_URL'),
+    ],
 
 ];

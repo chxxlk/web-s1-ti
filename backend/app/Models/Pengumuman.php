@@ -10,7 +10,7 @@ class Pengumuman extends Model
     use HasFactory;
 
     protected $table = 'pengumuman'; 
-    protected $fillable = ['judul', 'isi', 'file', 'kategori', 'user_id']; 
+    protected $fillable = ['judul', 'isi', 'file', 'kategori', 'user_id', 'created_at', 'update_at']; 
     //kalau mau liat urlnya di json reponse
     //protected $appends = ['file_url'];
     

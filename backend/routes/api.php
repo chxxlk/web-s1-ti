@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
 use App\Http\Controllers\DosenController;
+use App\Http\Controllers\ChatbotController;
+use App\Http\Controllers\ChatbotInfoController;
+
 
 // AUTH
 Route::post('/login', [AuthController::class, 'login']); // Login 
@@ -61,6 +64,18 @@ Route::get('/berita-alumni', [BeritaAlumniController::class, 'index']);
 Route::get('/berita-alumni/{id}', [BeritaAlumniController::class, 'show']);
 Route::get('/dosen', [DosenController::class, 'index']);
 Route::get('/dosen/{id}', [DosenController::class, 'show']);
+
+// Chatbot API
+Route::get('/test', [ChatbotController::class, 'testConnection']);
+Route::post('/chat', [ChatbotController::class, 'chat']);
+Route::get('/chat/stream', [ChatbotController::class, 'chatStream']);
+Route::get('/history', [ChatbotController::class, 'getHistory']);
+Route::get('/chatbot/info', [ChatbotInfoController::class, 'getInfo']);
+Route::get('/chatbot/welcome', [ChatbotInfoController::class, 'getWelcomeMessage']);
+Route::get('/test/openrouter', [ChatbotController::class, 'testOpenRouter']);
+Route::get('/test/hf', [ChatbotController::class, 'testEmbedding']);
+Route::get('/test/db', [ChatbotController::class, 'testDatabase']);
+
 
 // Hanya bisa diakses setelah login
 Route::middleware('auth:sanctum')->group(function () {

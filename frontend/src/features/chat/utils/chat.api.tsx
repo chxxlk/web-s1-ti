@@ -1,12 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from 'axios';
 
-// Base URL untuk Laravel 12.x backend
-const API_BASE_URL = import.meta.env.VITE_APP_BACKEND_URL;
+// Jika backend route streaming di /chat/stream (tanpa /api), atur BASE tanpa /api
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-// Buat instance axios dengan konfigurasi default
+// (Opsional) jika semua API di prefix /api, tetap bisa pakai `/api`
+const AXIOS_BASE = API_BASE_URL + '/api';
+
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 50000,
+  baseURL: AXIOS_BASE,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -14,157 +16,81 @@ const apiClient = axios.create({
   },
 });
 
-// Tambahkan interceptor untuk logging
-apiClient.interceptors.request.use(
-  (config) => {
-    // console.log('Making API request to:', config.url);
-    return config;
-  },
-  (error) => {
-    console.error('API request error:', error);
-    return Promise.reject(error);
+apiClient.interceptors.request.use((c) => c, (e) => Promise.reject(e));
+apiClient.interceptors.response.use((r) => r, (e) => {
+  if (e.response?.status === 422) {
+    const errors = e.response.data.errors;
+    const first = Object.values(errors)[0];
+    e.message = Array.isArray(first) ? first[0] : first;
   }
-);
+  return Promise.reject(e);
+});
 
-apiClient.interceptors.response.use(
-  (response) => {
-    console.log('API response received:', response.status);
-    return response;
-  },
-  (error) => {
-    console.error('API response error:', error.response || error.message);
-    
-    // Handle Laravel validation errors
-    if (error.response?.status === 422) {
-      const errors = error.response.data.errors;
-      const firstError = Object.values(errors)[0];
-      error.message = Array.isArray(firstError) ? firstError[0] : firstError;
-    }
-    
-    return Promise.reject(error);
-  }
-);
-
-export const sendChatMessage = async (message: string, sessionId: string = 'default') => {
-  try {
-    // console.log("Sending message to Laravel backend:", message);
-    
-    const response = await apiClient.post('/chat', {
-      message,
-      session_id: sessionId
-    });
-    
-    // console.log("Response from Laravel:", response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error('Full error details from Laravel API:', error);
-    
-    // Berikan error message yang lebih spesifik
-    if (error.code === 'ECONNREFUSED') {
-      throw new Error('Tidak dapat terhubung ke backend Laravel. Pastikan server berjalan di port 8000.');
-    } else if (error.response?.status === 404) {
-      throw new Error('Endpoint API tidak ditemukan. Periksa routes Laravel.');
-    } else if (error.response?.status === 500) {
-      throw new Error('Error internal server di backend Laravel. Periksa log Laravel.');
-    } else if (error.response?.data?.error) {
-      throw new Error(`Error Laravel: ${error.response.data.error}`);
-    } else {
-      throw new Error(`Gagal mengirim pesan: ${error.message || 'Error tidak diketahui'}`);
-    }
-  }
+export const sendChatMessage = async (message: string, sessionId = 'default') => {
+  const response = await apiClient.post('/chat', { message, session_id: sessionId });
+  return response.data;
 };
 
-/**
- * Mengambil riwayat chat sesuai dengan session ID.
- * Jika session ID tidak disediakan, maka default session ID adalah 'default'.
- * 
- * @param {string} sessionId - Session ID yang ingin diambil riwayat chatnya.
- * @returns {Promise<object[]>} - Promise yang berisi dengan riwayat chat yang diambil.
- * @throws {Error} - Jika terjadi error dalam mengambil riwayat chat, maka akan dilempar error dengan pesan yang sesuai.
- */
-export const getChatHistory = async (sessionId: string = 'default') => {
-  try {
-    const response = await apiClient.get('/history', {
-      params: { session_id: sessionId }
-    });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching chat history:', error);
-    
-    if (error.code === 'ECONNREFUSED') {
-      throw new Error('Tidak dapat terhubung ke backend Laravel. Pastikan server berjalan di port 8000.');
-    } else {
-      throw new Error('Gagal mengambil riwayat chat');
+export const streamChat = (
+  message: string,
+  sessionId = 'default',
+  onChunk: (chunk: string) => void,
+  onDone: () => void,
+  onError: (err: any) => void
+) => {
+  // Jika streaming ada di /api/chat/stream
+  const url = new URL(API_BASE_URL + '/api/chat/stream');
+  url.searchParams.append('message', message);
+  url.searchParams.append('session_id', sessionId);
+
+  const es = new EventSource(url.toString(), {
+    withCredentials: false,
+  });
+
+  es.onmessage = (evt) => {
+    try {
+      const data = JSON.parse(evt.data);
+      if (data.chunk) onChunk(data.chunk);
+      if (data.done) {
+        onDone();
+        es.close();
+      }
+    } catch (e) {
+      console.error('SSE parse error:', e, evt.data);
     }
-  }
+  };
+
+  es.onerror = (err) => {
+    console.error('SSE connection error:', err);
+    onError(err);
+    es.close();
+  };
+
+  return es;
 };
 
-/**
- * Menguji koneksi ke backend Laravel.
- * Jika koneksi gagal, maka akan dilempar error dengan pesan yang sesuai.
- * 
- * @returns {Promise<object>} - Promise yang berisi dengan hasil tes koneksi.
- * @throws {Error} - Jika terjadi error dalam menguji koneksi, maka akan dilempar error dengan pesan yang sesuai.
- */
+// Sisanya tidak banyak berubah
+export const getChatHistory = async (sessionId = 'default') => {
+  const resp = await apiClient.get('/history', { params: { session_id: sessionId } });
+  return resp.data;
+};
+
 export const testConnection = async () => {
-  try {
-    const response = await apiClient.get('/test');
-    return response.data;
-  } catch (error: any) {
-    console.error('Connection test failed:', error);
-    throw new Error(`Test koneksi backend gagal: ${error.message}`);
-  }
+  const resp = await apiClient.get('/test');
+  return resp.data;
 };
 
-/**
- * Menguji koneksi ke database Laravel.
- * Jika koneksi gagal, maka akan dilempar error dengan pesan yang sesuai.
- * 
- * @returns {Promise<object>} - Promise yang berisi dengan hasil tes koneksi ke database.
- * @throws {Error} - Jika terjadi error dalam menguji koneksi ke database, maka akan dilempar error dengan pesan yang sesuai.
-**/
 export const testDatabase = async () => {
-  try {
-    const response = await apiClient.get('/test-db');
-    return response.data;
-  } catch (error: any) {
-    console.error('Database test failed:', error);
-    throw new Error(`Test database gagal: ${error.message}`);
-  }
+  const resp = await apiClient.get('/test-db');
+  return resp.data;
 };
 
-/**
- * Mengambil informasi tentang chatbot.
- * Informasi yang diambil termasuk nama, deskripsi, dan versi.
- * Jika gagal mengambil informasi, maka akan dilempar error dengan pesan yang sesuai.
- * 
- * @returns {Promise<object>} - Promise yang berisi dengan informasi chatbot.
- * @throws {Error} - Jika terjadi error dalam mengambil informasi, maka akan dilempar error dengan pesan yang sesuai.
-**/
 export const getChatbotInfo = async () => {
-  try {
-    const response = await apiClient.get('/chatbot/info');
-    return response.data;
-  } catch (error: any) {
-    console.error('Failed to get chatbot info:', error);
-    throw new Error(`Gagal mengambil informasi chatbot: ${error.message}`);
-  }
+  const resp = await apiClient.get('/chatbot/info');
+  return resp.data;
 };
 
-/**
- * Mengambil pesan welcome dari backend Laravel.
- * Pesan welcome ini akan ditampilkan ketika user pertama kali membuka chatbot.
- * Jika gagal mengambil pesan welcome, maka akan dilempar error dengan pesan yang sesuai.
- * 
- * @returns {Promise<object>} - Promise yang berisi dengan pesan welcome.
- * @throws {Error} - Jika terjadi error dalam mengambil pesan welcome, maka akan dilempar error dengan pesan yang sesuai.
-**/
 export const getWelcomeMessage = async () => {
-  try {
-    const response = await apiClient.get('/chatbot/welcome');
-    return response.data;
-  } catch (error: any) {
-    console.error('Failed to get welcome message:', error);
-    throw new Error(`Gagal mengambil pesan welcome: ${error.message}`);
-  }
+  const resp = await apiClient.get('/chatbot/welcome');
+  return resp.data;
 };
