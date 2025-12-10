@@ -4,6 +4,7 @@
 
 - Pengumuman untuk mahasiswa S1 TI
 - Lowongan asisten dosen untuk mahasiswa S1 TI
+- Chatbot
 
 ## Authors
 
